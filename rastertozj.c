@@ -1,10 +1,11 @@
 // To get required headers, run
 // sudo apt-get install libcups2-dev libcupsimage2-dev
 #include <cups/cups.h>
-#include <cups/ppd.h>
+
 #include <cups/raster.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #ifndef DEBUGFILE
@@ -34,11 +35,22 @@ struct settings_ {
 struct settings_ settings;
 
 static void initializeSettings(char *commandLineOptionSettings, struct settings_ *pSettings) {
-  ppd_file_t *pPpd = ppdOpenFile(getenv("PPD"));
-  // char* sDestination = getenv("DestinationPrinterID");
   memset(pSettings, 0, sizeof(struct settings_));
-  pSettings->modelNum = pPpd->model_number;
-  ppdClose(pPpd);
+  const char *ppd_path = getenv("PPD");
+  if (ppd_path) {
+    FILE *f = fopen(ppd_path, "r");
+    if (f) {
+      char line[256];
+      while (fgets(line, sizeof(line), f)) {
+        int model = 0;
+        if (sscanf(line, "*cupsModelNumber: %d", &model) == 1) {
+          pSettings->modelNum = model;
+          break;
+        }
+      }
+      fclose(f);
+    }
+  }
 }
 
 static void update_settings_from_job (cups_page_header2_t * pHeader)
